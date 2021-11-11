@@ -60,9 +60,9 @@ type Tx struct {
 }
 
 type TxResponse struct {
-	Jsonrpc string              `json:"jsonrpc"`
-	ID      int                 `json:"id"`
-	Result  *[]TxResponseResult `json:"result"`
+	Jsonrpc string            `json:"jsonrpc"`
+	ID      int               `json:"id"`
+	Result  *TxResponseResult `json:"result"`
 }
 
 type TxResponseResult struct {
@@ -90,7 +90,7 @@ func getStateSyncTxns(start, end int) []Tx {
 
 	resp, err := http.Get(psMumbaiApiUrl)
 	if err != nil {
-		fmt.Println("No response from request")
+		fmt.Println("PS: No response from request")
 	}
 	defer resp.Body.Close()
 
@@ -98,33 +98,36 @@ func getStateSyncTxns(start, end int) []Tx {
 
 	var result PolygonScanResponse
 	if err := json.Unmarshal(body, &result); err != nil { // Parse []byte to the go struct pointer
-		fmt.Println("Can not unmarshal JSON")
+		fmt.Println("PS: Can not unmarshal JSON:")
+		fmt.Println(body)
+		fmt.Print("\n")
 	}
 
 	// fmt.Println(PrettyPrint(result))
 
+	fmt.Println("Got records: ", len(result.Result))
 	for _, rec := range result.Result {
 		txs = append(txs, Tx{BlockNumber: rec.BlockNumber, Hash: rec.Hash})
 	}
 	return txs
 }
 
-// func PrettyPrint(i interface{}) string {
-// 	s, _ := json.MarshalIndent(i, "", "\t")
-// 	return string(s)
-// }
+func PrettyPrint(i interface{}) string {
+	s, _ := json.MarshalIndent(i, "", "\t")
+	return string(s)
+}
 
 func main() {
 	var txs []Tx
-	currTime := time.Now().Format(time.RFC3339)
+	currTime := time.Now().Format("2006-01-02T15:04:05")
 	path := "missing_ss_txs" + currTime + ".json"
 	var file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		return
 	}
 
-	maxBlockNo := 18290000 //25000000
-	currBlockNo := 18280000
+	maxBlockNo := 21330000 //25000000
+	currBlockNo := 0
 	for currBlockNo < maxBlockNo {
 		nextBlockNo := currBlockNo + 50000
 		txs = getStateSyncTxns(currBlockNo, nextBlockNo)
@@ -160,14 +163,15 @@ func checkTxs(txs []Tx, file *os.File) {
 
 		var result TxResponse
 		if err := json.Unmarshal(body, &result); err != nil { // Parse []byte to the go struct pointer
-			fmt.Println("Can not unmarshal JSON")
+			fmt.Println("Bor: Cannot unmarshal JSON")
+			fmt.Println(string(body))
 		}
 
 		// fmt.Println("response Body:", string(body))
 
 		jsonStr, _ = json.Marshal(tx)
 		if err != nil {
-			fmt.Println("Cannot marshal json")
+			fmt.Println("Bor: Error dumping json")
 		}
 		if result.Result == nil {
 			file.WriteString(string(jsonStr) + "\n")
