@@ -46,4 +46,7 @@ func printBlockRLP(header *types.Header) {
 	output := hex.EncodeToString(data)
 	fmt.Printf("Block Number: %v\n", header.Number)
 	fmt.Printf("0x%s\n\n", output)
+
+	strOutput := string(data)
+	fmt.Println(strOutput + "\n")
 }
