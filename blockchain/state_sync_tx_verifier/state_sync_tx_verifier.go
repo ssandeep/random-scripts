@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 )
 
 /*
@@ -57,6 +59,30 @@ type Tx struct {
 	Hash        string
 }
 
+type TxResponse struct {
+	Jsonrpc string              `json:"jsonrpc"`
+	ID      int                 `json:"id"`
+	Result  *[]TxResponseResult `json:"result"`
+}
+
+type TxResponseResult struct {
+	BlockHash        string `json:"blockHash"`
+	BlockNumber      string `json:"blockNumber"`
+	From             string `json:"from"`
+	Gas              string `json:"gas"`
+	GasPrice         string `json:"gasPrice"`
+	Hash             string `json:"hash"`
+	Input            string `json:"input"`
+	Nonce            string `json:"nonce"`
+	To               string `json:"to"`
+	TransactionIndex string `json:"transactionIndex"`
+	Value            string `json:"value"`
+	Type             string `json:"type"`
+	V                string `json:"v"`
+	R                string `json:"r"`
+	S                string `json:"s"`
+}
+
 func getStateSyncTxns(start, end int) []Tx {
 	var txs []Tx
 	psMumbaiApiUrl := "https://api-testnet.polygonscan.com/api?module=account&action=txlist&address=0x0000000000000000000000000000000000000000&startblock=" + strconv.Itoa(start) + "&endblock=" + strconv.Itoa(end) + "&sort=asc"
@@ -78,7 +104,6 @@ func getStateSyncTxns(start, end int) []Tx {
 	// fmt.Println(PrettyPrint(result))
 
 	for _, rec := range result.Result {
-		fmt.Println(rec.BlockNumber)
 		txs = append(txs, Tx{BlockNumber: rec.BlockNumber, Hash: rec.Hash})
 	}
 	return txs
@@ -91,17 +116,26 @@ func getStateSyncTxns(start, end int) []Tx {
 
 func main() {
 	var txs []Tx
+	currTime := time.Now().Format(time.RFC3339)
+	path := "missing_ss_txs" + currTime + ".json"
+	var file, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		return
+	}
+
 	maxBlockNo := 18290000 //25000000
 	currBlockNo := 18280000
 	for currBlockNo < maxBlockNo {
 		nextBlockNo := currBlockNo + 50000
 		txs = getStateSyncTxns(currBlockNo, nextBlockNo)
-		checkTxs(txs)
+		checkTxs(txs, file)
 		currBlockNo = nextBlockNo
 	}
+
+	defer file.Close()
 }
 
-func checkTxs(txs []Tx) {
+func checkTxs(txs []Tx, file *os.File) {
 
 	// curl localhost:8545 -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_getTransactionByHash","params":["0xd96ecec3ac99e7e0f1edc62cff7d349c8c51cbfd0efc72f00662ecee6d41b14a"],"id":0}'
 
@@ -120,12 +154,23 @@ func checkTxs(txs []Tx) {
 		}
 		defer resp.Body.Close()
 
-		fmt.Println("response Status:", resp.Status)
-		fmt.Println("response Headers:", resp.Header)
+		// fmt.Println("response Status:", resp.Status)
+		// fmt.Println("response Headers:", resp.Header)
 		body, _ := ioutil.ReadAll(resp.Body)
-		fmt.Println("response Body:", string(body))
-		if `{"jsonrpc":"2.0","id":0,"result":null}` == string(body) {
-			panic("~~~~~\n\n\nyayyyyyyyyyyyyyyyy\n\n\n~~~~~")
+
+		var result TxResponse
+		if err := json.Unmarshal(body, &result); err != nil { // Parse []byte to the go struct pointer
+			fmt.Println("Can not unmarshal JSON")
+		}
+
+		// fmt.Println("response Body:", string(body))
+
+		jsonStr, _ = json.Marshal(tx)
+		if err != nil {
+			fmt.Println("Cannot marshal json")
+		}
+		if result.Result == nil {
+			file.WriteString(string(jsonStr) + "\n")
 		}
 
 	}
