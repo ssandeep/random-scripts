@@ -83,6 +83,9 @@ type TxResponseResult struct {
 	S                string `json:"s"`
 }
 
+var psCount int
+var missingTxs int
+
 func getStateSyncTxns(start, end int) []Tx {
 	var txs []Tx
 	psMumbaiApiUrl := "https://api-testnet.polygonscan.com/api?module=account&action=txlist&address=0x0000000000000000000000000000000000000000&startblock=" + strconv.Itoa(start) + "&endblock=" + strconv.Itoa(end) + "&sort=asc"
@@ -106,6 +109,7 @@ func getStateSyncTxns(start, end int) []Tx {
 	// fmt.Println(PrettyPrint(result))
 
 	fmt.Println("Got records: ", len(result.Result))
+	psCount += len(result.Result)
 	for _, rec := range result.Result {
 		txs = append(txs, Tx{BlockNumber: rec.BlockNumber, Hash: rec.Hash})
 	}
@@ -134,7 +138,9 @@ func main() {
 		checkTxs(txs, file)
 		currBlockNo = nextBlockNo
 	}
-
+	fmt.Println("Total no of records from PS: ", psCount)
+	fmt.Println("Total no of missing txs in Bor: ", missingTxs)
+	fmt.Println()
 	defer file.Close()
 }
 
@@ -175,6 +181,7 @@ func checkTxs(txs []Tx, file *os.File) {
 		}
 		if result.Result == nil {
 			file.WriteString(string(jsonStr) + "\n")
+			missingTxs += 1
 		}
 
 	}
